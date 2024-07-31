@@ -16,6 +16,8 @@ type EasyCache struct {
 	CacheIfStatusCodeLessThan int
 	// List of endpoints (Paths) to ignore
 	IgnoreEndpoints map[string]interface{}
+	// To dis/able logging
+	Logging bool
 }
 
 type CacheConfig struct {
@@ -23,6 +25,7 @@ type CacheConfig struct {
 	CleanUpInterval           int
 	CacheIfStatusCodeLessThan int
 	IgnoreEndpoints           map[string]interface{}
+	Logging                   bool
 }
 
 func NewCache(conf CacheConfig) EasyCache {
@@ -45,6 +48,7 @@ func NewCache(conf CacheConfig) EasyCache {
 		CleanUpInterval:           conf.CleanUpInterval,
 		CacheIfStatusCodeLessThan: conf.CacheIfStatusCodeLessThan,
 		IgnoreEndpoints:           conf.IgnoreEndpoints,
+		Logging:                   conf.Logging,
 	}
 }
 

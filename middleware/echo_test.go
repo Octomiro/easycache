@@ -1,10 +1,12 @@
 package middleware_test
 
 import (
-	"context"
+	"fmt"
 	"io"
 	"net/http"
+	"net/http/httptest"
 	"testing"
+	"time"
 
 	"github.com/labstack/echo/v4"
 	"github.com/octomiro/easycache"
@@ -18,13 +20,7 @@ func TestEchoMiddleware(t *testing.T) {
 
 	c := easycache.NewCache(easycache.CacheConfig{})
 	e := echo.New()
-
-	go func() {
-		_ = e.Start(":8001")
-	}()
-	defer func() {
-		_ = e.Shutdown(context.Background())
-	}()
+	e.HideBanner = true
 
 	e.GET("/home/:id", func(c echo.Context) error {
 		cacheMiss = true
@@ -33,7 +29,10 @@ func TestEchoMiddleware(t *testing.T) {
 		})
 	}, middleware.EchoCacheMiddleware(&c))
 
-	resp, err := http.Get("http://localhost:8001/home/123?query=321")
+	ts := httptest.NewServer(e)
+	defer ts.Close()
+
+	resp, err := http.Get(fmt.Sprintf("%s/home/123?query=321", ts.URL))
 	assert.NoError(t, err)
 	assert.Equal(t, true, cacheMiss)
 
@@ -45,7 +44,7 @@ func TestEchoMiddleware(t *testing.T) {
 	require.Equal(t, "{\"info\":\"done\"}\n", respStr)
 
 	cacheMiss = false
-	resp, err = http.Get("http://localhost:8001/home/123?query=321")
+	resp, err = http.Get(fmt.Sprintf("%s/home/123?query=321", ts.URL))
 	assert.NoError(t, err)
 	assert.Equal(t, false, cacheMiss)
 
@@ -53,4 +52,55 @@ func TestEchoMiddleware(t *testing.T) {
 	require.NoError(t, err)
 
 	assert.Equal(t, respStr, string(content))
+}
+
+func BenchmarkEchoMiddleware(b *testing.B) {
+	c := easycache.NewCache(easycache.CacheConfig{})
+	e := echo.New()
+	e.HideBanner = true
+
+	e.GET("/home/:id", func(c echo.Context) error {
+		time.Sleep(100 * time.Millisecond)
+		return c.JSON(http.StatusOK, map[string]string{
+			"id":    c.Param("id"),
+			"query": c.QueryParam("query"),
+			"info":  "done",
+		})
+	}, middleware.EchoCacheMiddleware(&c))
+
+	ts := httptest.NewServer(e)
+	defer ts.Close()
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		for i := 0; i < 200; i++ {
+			_, err := http.Get(fmt.Sprintf("%s/home/123?query=321", ts.URL))
+			require.NoError(b, err)
+		}
+	}
+}
+
+func BenchmarkEchoWithoutMiddleware(b *testing.B) {
+	e := echo.New()
+	e.HideBanner = true
+
+	e.GET("/home/:id", func(c echo.Context) error {
+		time.Sleep(100 * time.Millisecond)
+		return c.JSON(http.StatusOK, map[string]string{
+			"id":    c.Param("id"),
+			"query": c.QueryParam("query"),
+			"info":  "done",
+		})
+	})
+
+	ts := httptest.NewServer(e)
+	defer ts.Close()
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		for i := 0; i < 200; i++ {
+			_, err := http.Get(fmt.Sprintf("%s/home/123?query=321", ts.URL))
+			require.NoError(b, err)
+		}
+	}
 }

@@ -44,10 +44,16 @@ func EchoCacheMiddleware(ec *easycache.EasyCache) echo.MiddlewareFunc {
 
 			val, ok := ec.Cache().Get(key)
 			if ok {
-				log.Printf("cache hit for %s", key)
+				if ec.Logging {
+					log.Printf("cache hit for %s", key)
+				}
+
 				resp, ok := val.(easycache.Response)
 				if !ok {
-					log.Println("could not read cached response")
+					if ec.Logging {
+						log.Println("could not read cached response")
+					}
+
 					return next(c)
 				}
 
@@ -57,12 +63,17 @@ func EchoCacheMiddleware(ec *easycache.EasyCache) echo.MiddlewareFunc {
 
 				_, err := c.Response().Write(resp.Response)
 				if err != nil {
-					log.Println("could not write cached response to client")
+					if ec.Logging {
+						log.Println("could not write cached response to client")
+					}
+
 					return next(c)
 				}
 				return err
 			}
-			log.Printf("cache miss for %s", key)
+			if ec.Logging {
+				log.Printf("cache miss for %s", key)
+			}
 
 			// Capture Response
 			resBody := new(bytes.Buffer)
